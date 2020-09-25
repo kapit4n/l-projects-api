@@ -31,22 +31,27 @@ object Main extends App {
         "https://github.com/kapit4n/l-projects", 
         "Register projects", 
         Seq(Feature("Finch")),
-        Seq(Skill("JavaScript")),
+        Seq(Skill("JavaScript"), Skill("React js"), Skill("Github")),
         Seq(Category(""))
       )
     ))
   }
 
-  /* 
-  def hello: Endpoint[IO, Message] = get("projects" :: path[String]) { name: String =>
-    Ok(Message(s))
+   
+  def getProject: Endpoint[IO, Project] = get("projects" :: path[String]) { Id: String =>
+    Ok(Project(
+        "l-project", 
+        "https://github.com/kapit4n/l-projects", 
+        "Register projects", 
+        Seq(Feature("Finch")),
+        Seq(Skill("JavaScript"), Skill("React js"), Skill("Github")),
+        Seq(Category("Full Stack"))
+      ))
   }
-  */
 
   def service: Service[Request, Response] = Bootstrap
     .serve[Text.Plain](healthcheck)
-  //  .serve[Application.Json](hello :+: projects)
-    .serve[Application.Json](projects)
+    .serve[Application.Json](getProject :+: projects)
     .toService
 
 
