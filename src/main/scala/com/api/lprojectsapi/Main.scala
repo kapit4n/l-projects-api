@@ -1,6 +1,7 @@
 package com.api.lprojectsapi
 
 import cats.effect.IO
+import com.twitter.finagle.http.filter.Cors
 import com.twitter.finagle.{Http, Service}
 import com.twitter.finagle.http.{Request, Response}
 import com.twitter.util.Await
@@ -27,12 +28,13 @@ object Main extends App {
     Ok(Seq(
       Project(
         "l-project", 
-        "code.com", 
+        "https://github.com/kapit4n/l-projects", 
         "Register projects", 
         Seq(Feature("Finch")),
         Seq(Skill("JavaScript")),
         Seq(Category(""))
-      )))
+      )
+    ))
   }
 
   /* 
@@ -46,6 +48,15 @@ object Main extends App {
   //  .serve[Application.Json](hello :+: projects)
     .serve[Application.Json](projects)
     .toService
+
+
+  val policy: Cors.Policy = Cors.Policy(
+    allowsOrigin = _ => Some(""),
+    allowsMethods = _ => Some(Seq("GET", "POST")),
+    allowsHeaders = _ => Some(Seq("Accept"))
+  )
+
+  val corsService: Service[Request, Response] = new Cors.HttpFilter(policy).andThen(service)
 
   Await.ready(Http.server.serve(":8081", service))
 }
