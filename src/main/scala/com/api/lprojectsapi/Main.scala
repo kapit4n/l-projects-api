@@ -9,13 +9,27 @@ import io.finch._
 import io.finch.catsEffect._
 import io.finch.circe._
 import io.circe.generic.auto._
+import scalikejdbc._
+import java.time._
 
-import scala.collection.Seq
 
 object Main extends App {
 
+case class Project2(id: Long, name: Option[String], createdAt: ZonedDateTime)
+object Project2 extends SQLSyntaxSupport[Project2] {
+  override val tableName = "projects"
+  def apply(rs: WrappedResultSet) = new Project2(
+    rs.long("id"), rs.stringOpt("name"), rs.zonedDateTime("created_at"))
+}
+
+import scala.collection.Seq
+  Class.forName("org.h2.Driver")
+  ConnectionPool.singleton("jdbc:h2:mem:hello", "user", "pass")
+
+  implicit val session = AutoSession
   case class Project(name: String, url: String, description: String, features: Seq[Feature],
     skills: Seq[Skill], categories: Seq[Category])
+
   case class Feature(name: String)
   case class Skill(name: String)
   case class Category(name: String)
@@ -24,7 +38,7 @@ object Main extends App {
     Ok("OK")
   }
 
-  def projects: Endpoint[IO, Seq[Project]] = get("projects") {
+  def projects2: Endpoint[IO, Seq[Project]] = get("projects2") {
     Ok(Seq(
       Project(
         "l-project", 
@@ -34,7 +48,38 @@ object Main extends App {
         Seq(Skill("JavaScript"), Skill("React js"), Skill("Github")),
         Seq(Category(""))
       )
-    ))
+    )) 
+  }
+  
+
+  def buildTables: Endpoint[IO, Int] = get("buildTables") {
+    sql"""
+    create table projects (
+      id serial not null primary key,
+      name varchar(64),
+      created_at timestamp not null
+    )
+    """.execute.apply()
+    Ok(1)
+  }
+
+  
+  def initialValues: Endpoint[IO, Int] = get("initialValues") {
+    Seq("Project 1", "Project 2", "Project 3") foreach { name =>
+      sql"insert into projects (name, created_at) values (${name}, current_timestamp)".update.apply()
+    }
+    Ok(1)
+  }
+
+
+
+  def projects: Endpoint[IO, List[Project2]] = get("projects") {
+
+    val entities: List[Map[String, Any]] = sql"select * from projects".map(_.toMap).list.apply()
+
+    val projects: List[Project2] = sql"select * from projects".map(rs => Project2(rs)).list.apply()
+
+    Ok(projects)
   }
 
    
@@ -51,7 +96,7 @@ object Main extends App {
 
   def service: Service[Request, Response] = Bootstrap
     .serve[Text.Plain](healthcheck)
-    .serve[Application.Json](getProject :+: projects)
+    .serve[Application.Json](getProject :+: projects :+: buildTables)
     .toService
 
 
