@@ -20,27 +20,10 @@ object Main extends App {
   ConnectionPool.singleton("jdbc:h2:mem:hello", "user", "pass")
 
   implicit val session = AutoSession
-  case class Project(name: String, url: String, description: String, features: Seq[Feature],
-    skills: Seq[Skill], categories: Seq[Category])
-
 
   def healthcheck: Endpoint[IO, String] = get(pathEmpty) {
     Ok("OK")
   }
-
-  def projects2: Endpoint[IO, Seq[Project]] = get("projects2") {
-    Ok(Seq(
-      Project(
-        "l-project", 
-        "https://github.com/kapit4n/l-projects", 
-        "Register projects", 
-        Seq(Feature("Finch")),
-        Seq(Skill("JavaScript"), Skill("React js"), Skill("Github")),
-        Seq(Category(""))
-      )
-    )) 
-  }
-  
 
   def buildTables: Endpoint[IO, Int] = get("buildTables") {
     // create projects table
@@ -98,20 +81,22 @@ object Main extends App {
     Ok(projects)
   }
 
-  def getProject: Endpoint[IO, Project] = get("projects" :: path[String]) { Id: String =>
-    Ok(Project(
-        "l-project", 
-        "https://github.com/kapit4n/l-projects", 
-        "Register projects", 
-        Seq(Feature("Finch")),
-        Seq(Skill("JavaScript"), Skill("React js"), Skill("Github")),
-        Seq(Category("Full Stack"))
-      ))
+
+  def postProject : Endpoint[IO, String] = post("projects" :: jsonBody[ProjectInfo]) { project: ProjectInfo => 
+      Ok(s"Project info, ${project.name}")
+  }
+
+  def getProject: Endpoint[IO, ProjectInfo] = get("projects" :: path[Int]) { Id: Int =>
+    val entities: List[Map[String, Any]] = sql"select * from projects where id = ${Id}".map(_.toMap).list.apply()
+
+    val projects: List[ProjectInfo] = sql"select * from projects".map(rs => ProjectInfo(rs)).list.apply()
+
+    Ok(projects(1))
   }
 
   def service: Service[Request, Response] = Bootstrap
     .serve[Text.Plain](healthcheck)
-    .serve[Application.Json](getProject :+: projects :+: buildTables :+: initialValues)
+    .serve[Application.Json](getProject :+: postProject :+: projects :+: buildTables :+: initialValues)
     .toService
 
 
