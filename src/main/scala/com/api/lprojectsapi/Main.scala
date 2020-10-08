@@ -11,18 +11,11 @@ import io.finch.circe._
 import io.circe.generic.auto._
 import scalikejdbc._
 import java.time._
-
+import scala.collection.Seq
+import com.api.lprojectsapi.models._
 
 object Main extends App {
 
-case class Project2(id: Long, name: Option[String], createdAt: ZonedDateTime)
-object Project2 extends SQLSyntaxSupport[Project2] {
-  override val tableName = "projects"
-  def apply(rs: WrappedResultSet) = new Project2(
-    rs.long("id"), rs.stringOpt("name"), rs.zonedDateTime("created_at"))
-}
-
-import scala.collection.Seq
   Class.forName("org.h2.Driver")
   ConnectionPool.singleton("jdbc:h2:mem:hello", "user", "pass")
 
@@ -30,9 +23,6 @@ import scala.collection.Seq
   case class Project(name: String, url: String, description: String, features: Seq[Feature],
     skills: Seq[Skill], categories: Seq[Category])
 
-  case class Feature(name: String)
-  case class Skill(name: String)
-  case class Category(name: String)
 
   def healthcheck: Endpoint[IO, String] = get(pathEmpty) {
     Ok("OK")
@@ -53,36 +43,61 @@ import scala.collection.Seq
   
 
   def buildTables: Endpoint[IO, Int] = get("buildTables") {
+    // create projects table
     sql"""
     create table projects (
       id serial not null primary key,
-      name varchar(64),
+      name varchar(255),
+      url varchar(255),
+      description varchar(255),
       created_at timestamp not null
     )
     """.execute.apply()
+    
+    // create skills table
+    sql"""
+    create table skills (
+      id serial not null primary key,
+      name varchar(255)
+    )
+    """.execute.apply()
+
+    // create features table
+    sql"""
+    create table features (
+      id serial not null primary key,
+      name varchar(255)
+    )
+    """.execute.apply()
+
+    // create category table
+    sql"""
+    create table categories (
+      id serial not null primary key,
+      name varchar(255)
+    )
+    """.execute.apply()
+
+
     Ok(1)
   }
-
   
   def initialValues: Endpoint[IO, Int] = get("initialValues") {
-    Seq("Project 1", "Project 2", "Project 3") foreach { name =>
-      sql"insert into projects (name, created_at) values (${name}, current_timestamp)".update.apply()
+    Seq(Seq("Project 1", "url", "description")) foreach { pj =>
+      sql"insert into projects (name, url, description, created_at) values (${pj(0)}, ${pj(1)}, ${pj(2)}, current_timestamp)".update.apply()
     }
     Ok(1)
   }
 
-
-
-  def projects: Endpoint[IO, List[Project2]] = get("projects") {
+  def projects: Endpoint[IO, List[ProjectInfo]] = get("projects") {
 
     val entities: List[Map[String, Any]] = sql"select * from projects".map(_.toMap).list.apply()
 
-    val projects: List[Project2] = sql"select * from projects".map(rs => Project2(rs)).list.apply()
+    val projects: List[ProjectInfo] = sql"select * from projects".map(rs => ProjectInfo(rs)).list.apply()
 
     Ok(projects)
   }
 
-   
   def getProject: Endpoint[IO, Project] = get("projects" :: path[String]) { Id: String =>
     Ok(Project(
         "l-project", 
@@ -96,7 +111,7 @@ import scala.collection.Seq
 
   def service: Service[Request, Response] = Bootstrap
     .serve[Text.Plain](healthcheck)
-    .serve[Application.Json](getProject :+: projects :+: buildTables)
+    .serve[Application.Json](getProject :+: projects :+: buildTables :+: initialValues)
     .toService
 
 
